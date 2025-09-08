@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MP4 Player Responsif – Sederhana</title>
+  <style>
+    :root{
+      --bg:#0f172a; --panel:#111827; --muted:#334155; --text:#e5e7eb; --accent:#38bdf8;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; font-family:system-ui,Segoe UI,Roboto,Inter,Arial; background:#0b1220; color:var(--text); min-height:100svh; display:flex; align-items:center; justify-content:center; padding:24px}
+    .wrap{width:min(100%,900px)}
+    header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px}
+    header h1{font-size:clamp(18px,2.5vw,24px); margin:0}
+
+    .player{background:var(--panel); border:1px solid #1f2937; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.35); overflow:hidden}
+    .video-stage{position:relative; aspect-ratio:16/9; background:#000}
+    video{position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#000}
+
+    /* Seek (display-only) */
+    .seek{display:flex; align-items:center; gap:10px; padding:10px 12px; background:linear-gradient(180deg, rgba(17,24,39,.65), rgba(17,24,39,.95)); border-top:1px solid #1f2937}
+    .time{font-variant-numeric:tabular-nums; opacity:.9}
+    .bar{position:relative; flex:1; height:10px; background:#0b1220; border-radius:999px; overflow:hidden; border:1px solid #1f2937}
+    .progress{position:absolute; inset:0; background:linear-gradient(90deg,var(--accent) 0 var(--prog,0%), transparent var(--prog,0%));}
+    input[type="range"].seek-range{position:absolute; inset:0; width:100%; height:100%; opacity:0; pointer-events:none}
+
+    .controls{display:flex; align-items:center; gap:10px; padding:12px; border-top:1px solid #1f2937; background:linear-gradient(180deg, rgba(17,24,39,.65), rgba(17,24,39,.95));}
+    button{appearance:none; border:0; background:#111827; color:var(--text); padding:10px 12px; border-radius:12px; cursor:pointer; font-weight:600}
+    button:hover{outline:1px solid var(--muted); background:#0b1220}
+    button[aria-pressed="true"]{outline:2px solid var(--accent)}
+    .hint{opacity:.7; font-size:.9rem; margin-top:10px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>MP4 Player Responsif – Sederhana</h1>
+      <div class="hint">Kontrol minimal: Putar/Jeda. Slider hanya tampilan. Notif saat video selesai.</div>
+    </header>
+
+    <div class="player" role="region" aria-label="Pemutar Video">
+      <div class="video-stage" id="stage">
+        <video id="video" preload="metadata" playsinline crossorigin="anonymous" poster="" aria-label="Video">
+          <!-- Sumber diarahkan langsung di dalam kode: ganti URL di bawah dengan file Anda -->
+          <source id="mp4src" src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" type="video/mp4" />
+        </video>
+      </div>
+
+      <div class="seek" aria-label="Batang Progres (tampilan saja)">
+        <div class="time" id="current">00:00</div>
+        <div class="bar" id="bar">
+          <div class="progress" id="progress"></div>
+          <input class="seek-range" id="seek" type="range" min="0" max="1000" value="0" step="1" disabled aria-disabled="true" />
+        </div>
+        <div class="time" id="duration">00:00</div>
+      </div>
+
+      <div class="controls" aria-label="Kontrol Pemutar">
+        <button id="play" aria-label="Putar/Jeda">▶︎ / ❚❚</button>
+      </div>
+    </div>
+
+    <p class="hint">Pintasan keyboard aktif: <strong>Spasi/K</strong> untuk putar/jeda. Saat video selesai akan muncul notifikasi.</p>
+  </div>
+
+  <script>
+    const $ = (s, r = document) => r.querySelector(s);
+    const video = $('#video');
+    const playBtn = $('#play');
+    const seek = $('#seek');
+    const cur = $('#current');
+    const dur = $('#duration');
+    const prog = $('#progress');
+
+    function toTime(t){
+      if (!isFinite(t)) return '00:00';
+      const s = Math.floor(t % 60).toString().padStart(2,'0');
+      const m = Math.floor((t/60)%60).toString().padStart(2,'0');
+      const h = Math.floor(t/3600);
+      return h? `${h}:${m}:${s}` : `${m}:${s}`;
+    }
+
+    function updateTimes(){
+      cur.textContent = toTime(video.currentTime);
+      dur.textContent = toTime(video.duration);
+      const p = (video.currentTime / (video.duration||1))*100;
+      prog.style.setProperty('--prog', `${p}%`);
+      seek.value = Math.round(p*10); // display only
+    }
+
+    function togglePlay(){
+      if (video.paused) video.play(); else video.pause();
+    }
+
+    function setPausedUI(){
+      playBtn.setAttribute('aria-pressed', video.paused? 'true':'false');
+    }
+
+    // Events
+    video.addEventListener('loadedmetadata', updateTimes);
+    video.addEventListener('timeupdate', updateTimes);
+    video.addEventListener('progress', updateTimes);
+    video.addEventListener('play', setPausedUI);
+    video.addEventListener('pause', setPausedUI);
+
+    // Notifikasi saat selesai
+    video.addEventListener('ended', ()=>{
+      alert('Video selesai diputar.');
+    });
+
+    // Kontrol
+    playBtn.addEventListener('click', togglePlay);
+
+    // Pintasan minimal
+    document.addEventListener('keydown', (e)=>{
+      const tag = (e.target||{}).tagName || '';
+      if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
+      if (e.code === 'Space' || e.key.toLowerCase() === 'k'){ e.preventDefault(); togglePlay(); }
+      // Tidak ada J/L/Arrow, volume, speed, PiP, fullscreen.
+    });
+
+    // Mulai otomatis play ringan (biarkan policy browser menentukannya)
+    video.play().catch(()=>{});
+  </script>
+</body>
+</html>
